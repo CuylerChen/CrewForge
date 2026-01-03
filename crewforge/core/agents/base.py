@@ -40,6 +40,7 @@ class BaseCrewForgeAgent(ABC):
         """Get the LLM instance for this agent."""
         llm_config = get_llm_config()
 
+        # get_model_for_role already handles provider prefixes
         if self._model:
             model = self._model
         else:
@@ -50,28 +51,48 @@ class BaseCrewForgeAgent(ABC):
             api_key = llm_config.openai_compatible_api_key or os.getenv("OPENROUTER_API_KEY")
             base_url = llm_config.openai_compatible_base_url
 
-            # For OpenRouter, use the model ID directly with base_url
             return LLM(
                 model=model,
                 base_url=base_url,
                 api_key=api_key,
             )
         elif llm_config.provider == LLMProvider.ANTHROPIC:
-            return LLM(
-                model=f"anthropic/{model}",
-                api_key=llm_config.anthropic_api_key,
-            )
+            # Support custom base_url for Anthropic proxies
+            if llm_config.anthropic_base_url:
+                return LLM(
+                    model=model,  # No prefix for custom endpoints
+                    base_url=llm_config.anthropic_base_url,
+                    api_key=llm_config.anthropic_api_key,
+                    temperature=llm_config.temperature,
+                    max_tokens=llm_config.max_tokens,
+                )
+            else:
+                return LLM(
+                    model=model,  # get_model_for_role adds anthropic/ prefix
+                    api_key=llm_config.anthropic_api_key,
+                    temperature=llm_config.temperature,
+                    max_tokens=llm_config.max_tokens,
+                )
         elif llm_config.provider == LLMProvider.OLLAMA:
             return LLM(
-                model=f"ollama/{model}",
+                model=model,  # get_model_for_role adds ollama/ prefix
                 base_url=llm_config.ollama_base_url,
             )
         else:
-            # OpenAI
-            return LLM(
-                model=model,
-                api_key=llm_config.openai_api_key,
-            )
+            # OpenAI - support custom base_url
+            if llm_config.openai_base_url:
+                # Force openai provider to avoid LiteLLM auto-detecting based on model name
+                # This prevents it from trying to use anthropic SDK for claude models
+                return LLM(
+                    model=f"openai/{model}",
+                    base_url=llm_config.openai_base_url,
+                    api_key=llm_config.openai_api_key,
+                )
+            else:
+                return LLM(
+                    model=model,
+                    api_key=llm_config.openai_api_key,
+                )
 
     @property
     def model(self) -> str:

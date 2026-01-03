@@ -92,10 +92,19 @@ class LLMConfig(BaseSettings):
             # For OpenRouter, use openrouter/ prefix
             if self.openai_compatible_base_url and "openrouter" in self.openai_compatible_base_url:
                 return f"openrouter/{model}"
-            # For other compatible APIs, use openai/ prefix with base_url
+            # For other compatible APIs, return model as-is
             return model
         elif self.provider == LLMProvider.ANTHROPIC:
+            # For custom base_url, don't add anthropic/ prefix
+            # The proxy handles the routing
+            if self.anthropic_base_url:
+                return model
             return f"anthropic/{model}"
+        elif self.provider == LLMProvider.OPENAI:
+            # For custom base_url, don't add openai/ prefix
+            if self.openai_base_url:
+                return model
+            return model
         elif self.provider == LLMProvider.OLLAMA:
             return f"ollama/{model}"
 

@@ -386,16 +386,17 @@ Create clear documentation that developers can follow.""",
         self.db.update_project_status(self.project.id, ProjectStatus.DEVELOPING)
 
         # Create the implementation crew with hierarchical process
+        # Note: manager_agent should NOT be in the agents list for hierarchical mode
+        # and manager_agent cannot have tools
         crew = Crew(
             agents=[
-                self.manager.create_agent(),
                 self.developer.create_agent(),
                 self.reviewer.create_agent(),
             ],
             tasks=self._create_implementation_tasks(tasks),
             verbose=self.verbose,
             process=Process.hierarchical,
-            manager_agent=self.manager.create_agent(),
+            manager_agent=self.manager.create_agent(as_manager=True),
         )
 
         with Progress(

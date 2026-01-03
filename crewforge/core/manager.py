@@ -79,7 +79,7 @@ class ManagerAgent:
     def get_llm(self) -> Any:
         """Get the LLM instance for this agent."""
         llm_config = get_llm_config()
-        model = self.model
+        model = self.model  # Already includes provider prefix if needed
 
         if llm_config.provider == LLMProvider.OPENAI_COMPATIBLE:
             api_key = llm_config.openai_compatible_api_key or os.getenv("OPENROUTER_API_KEY")
@@ -91,20 +91,42 @@ class ManagerAgent:
                 api_key=api_key,
             )
         elif llm_config.provider == LLMProvider.ANTHROPIC:
-            return LLM(
-                model=f"anthropic/{model}",
-                api_key=llm_config.anthropic_api_key,
-            )
+            # Support custom base_url for Anthropic proxies
+            if llm_config.anthropic_base_url:
+                return LLM(
+                    model=model,  # No prefix for custom endpoints
+                    base_url=llm_config.anthropic_base_url,
+                    api_key=llm_config.anthropic_api_key,
+                    temperature=llm_config.temperature,
+                    max_tokens=llm_config.max_tokens,
+                )
+            else:
+                return LLM(
+                    model=model,  # get_model_for_role adds anthropic/ prefix
+                    api_key=llm_config.anthropic_api_key,
+                    temperature=llm_config.temperature,
+                    max_tokens=llm_config.max_tokens,
+                )
         elif llm_config.provider == LLMProvider.OLLAMA:
             return LLM(
-                model=f"ollama/{model}",
+                model=model,  # get_model_for_role adds ollama/ prefix
                 base_url=llm_config.ollama_base_url,
             )
         else:
-            return LLM(
-                model=model,
-                api_key=llm_config.openai_api_key,
-            )
+            # OpenAI - support custom base_url
+            if llm_config.openai_base_url:
+                # Force openai provider to avoid LiteLLM auto-detecting based on model name
+                # This prevents it from trying to use anthropic SDK for claude models
+                return LLM(
+                    model=f"openai/{model}",
+                    base_url=llm_config.openai_base_url,
+                    api_key=llm_config.openai_api_key,
+                )
+            else:
+                return LLM(
+                    model=model,
+                    api_key=llm_config.openai_api_key,
+                )
 
     def get_tools(self) -> list:
         """Get manager-specific tools."""
@@ -113,8 +135,25 @@ class ManagerAgent:
             ShellExecutorTool(),
         ]
 
-    def create_agent(self) -> Agent:
-        """Create and return the Manager agent."""
+    def create_agent(self, as_manager: bool = False) -> Agent:
+        """Create and return the Manager agent.
+
+        Args:
+            as_manager: If True, creates agent for hierarchical mode (no tools).
+                       If False, creates agent with tools for sequential tasks.
+        """
+        # For hierarchical mode, manager_agent cannot have tools
+        if as_manager:
+            return Agent(
+                role=self.name,
+                goal=self.goal,
+                backstory=self.backstory,
+                tools=[],  # No tools for hierarchical manager
+                verbose=self.verbose,
+                allow_delegation=True,
+                llm=self.get_llm(),
+            )
+
         if self._agent is None:
             self._agent = Agent(
                 role=self.name,
