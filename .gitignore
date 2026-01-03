@@ -1,6 +1,7 @@
 # Python
 .venv/
 venv/
+projects/
 __pycache__/
 *.pyc
 .env
