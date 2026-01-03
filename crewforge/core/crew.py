@@ -189,23 +189,59 @@ class CrewForgeOrchestrator:
 
         self.db.update_project_status(self.project.id, ProjectStatus.ARCHITECTURE_PENDING)
 
-        # Create architecture task
+        # Create architecture task - Architect analyzes requirements and recommends tech stack
         arch_task = Task(
-            description=f"""Design the software architecture for the following requirements:
+            description=f"""Analyze the following requirements and design the software architecture:
 
 {requirements}
 
+## Your Tasks:
+
+### 1. Determine Project Type
+First, analyze what type of project this is:
+- Frontend only (web app, mobile app, browser extension)
+- Backend only (API, CLI tool, library, daemon service)
+- Full-stack (frontend + backend)
+- Other (data pipeline, ML model, infrastructure, etc.)
+
+### 2. Recommend Technology Stack
+Based on the requirements, recommend the most suitable tech stack.
+Be specific and practical. Consider:
+- Project complexity and scale
+- Team expertise (if mentioned)
+- Performance requirements
+- Deployment environment
+
+Format your tech stack recommendation as:
+```yaml
+tech_stack:
+  type: frontend-only | backend-only | fullstack | cli | library | other
+  # Include only relevant sections based on type:
+  frontend:  # if applicable
+    language: ...
+    framework: ...
+    build_tool: ...
+  backend:   # if applicable
+    language: ...
+    framework: ...
+  database:  # if applicable
+    type: ...
+    name: ...
+  infrastructure:  # if applicable
+    ...
+```
+
+### 3. System Design
 Provide:
 1. System overview and high-level design
-2. Technology stack recommendations
-3. Component structure and interactions
-4. Data models and storage design
-5. API design (if applicable)
-6. File/folder structure
-7. Key design decisions and rationale
+2. Component structure and interactions
+3. Data models and storage design (if applicable)
+4. API design (if applicable)
+5. File/folder structure
+6. Key design decisions and rationale
 
 Create clear documentation that developers can follow.""",
-            expected_output="Detailed architecture document with diagrams (as text) and specifications",
+            expected_output="Tech stack recommendation (in YAML format) followed by detailed architecture document",
             agent=self.architect.create_agent(),
         )
 
@@ -228,8 +264,47 @@ Create clear documentation that developers can follow.""",
         architecture = str(result)
         self.db.update_project_architecture(self.project.id, architecture)
 
+        # Extract and save tech_stack to crewforge.yaml
+        self._save_tech_stack(architecture)
+
         console.print("[green]Architecture design completed[/]")
         return architecture
+
+    def _save_tech_stack(self, architecture: str):
+        """Extract tech_stack from architecture and save to crewforge.yaml."""
+        import yaml
+        import re
+
+        config_path = self.project_path / "crewforge.yaml"
+        if not config_path.exists():
+            return
+
+        # Try to extract tech_stack YAML block from architecture
+        yaml_pattern = r"```yaml\s*\n(tech_stack:.*?)```"
+        match = re.search(yaml_pattern, architecture, re.DOTALL)
+
+        if match:
+            try:
+                tech_stack_yaml = match.group(1)
+                tech_stack_data = yaml.safe_load(tech_stack_yaml)
+
+                # Load existing config
+                with open(config_path) as f:
+                    config = yaml.safe_load(f) or {}
+
+                # Update tech_stack
+                if tech_stack_data and "tech_stack" in tech_stack_data:
+                    config["tech_stack"] = tech_stack_data["tech_stack"]
+                elif tech_stack_data:
+                    config["tech_stack"] = tech_stack_data
+
+                # Save updated config
+                with open(config_path, "w") as f:
+                    yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+                console.print("[dim]Tech stack saved to crewforge.yaml[/]")
+            except Exception as e:
+                console.print(f"[yellow]Warning: Could not parse tech stack: {e}[/]")
 
     def _confirm_architecture(self, architecture: str) -> bool:
         """Confirm architecture with user."""

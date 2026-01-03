@@ -57,22 +57,15 @@ def init(
     project_path.mkdir(parents=True, exist_ok=True)
 
     # Create project configuration file
+    # tech_stack will be determined by Architect after requirements analysis
     config = {
         "project": {
             "name": name,
             "version": "0.1.0",
         },
-        "tech_stack": {
-            "backend": {
-                "language": "python",
-                "framework": "fastapi",
-            },
-            "frontend": {
-                "language": "typescript",
-                "framework": "react",
-            },
-            "database": "postgresql",
-        },
+        # tech_stack: will be filled by Architect based on requirements
+        # Supports: frontend-only, backend-only, fullstack, cli, library, etc.
+        "tech_stack": None,
         "agents": {
             "architect": {"enabled": True},
             "developer": {"enabled": True},
@@ -89,15 +82,15 @@ def init(
 
     config_path = project_path / "crewforge.yaml"
     with open(config_path, "w") as f:
-        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
     console.print(Panel(
         f"[green]Project initialized successfully![/]\n\n"
         f"Path: {project_path}\n"
         f"Config: {config_path}\n\n"
         f"Next steps:\n"
-        f"  1. Edit crewforge.yaml to configure your tech stack\n"
-        f"  2. Run [bold]crewforge run[/] to start development",
+        f"  Run [bold]crewforge run[/] to start development\n"
+        f"  (Tech stack will be recommended based on your requirements)",
         title="CrewForge Init"
     ))
 

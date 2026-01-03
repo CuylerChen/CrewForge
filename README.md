@@ -128,14 +128,9 @@ project:
   name: my-project
   version: 0.1.0
 
-tech_stack:
-  backend:
-    language: python
-    framework: fastapi
-  frontend:
-    language: typescript
-    framework: react
-  database: postgresql
+# tech_stack 由 Architect 智能体根据需求分析后自动填充
+# 支持类型：frontend-only, backend-only, fullstack, cli, library 等
+tech_stack: null
 
 agents:
   architect:
@@ -155,6 +150,15 @@ git:
   auto_merge: true
 ```
 
+**注意**：技术栈不需要预先配置。当你运行 `crewforge run` 并输入需求后，Architect 智能体会分析需求并推荐最合适的技术栈。
+
+支持的项目类型：
+- **Frontend only**: 纯前端项目（Web 应用、浏览器扩展等）
+- **Backend only**: 纯后端项目（API、CLI 工具、库等）
+- **Fullstack**: 前后端分离项目
+- **CLI**: 命令行工具
+- **Library**: 代码库/SDK
+
 ### 启动开发
 
 ```bash
@@ -171,11 +175,16 @@ crewforge run --verbose
 ### 工作流程
 
 1. **需求确认** - 输入需求描述，人工确认
-2. **架构设计** - Architect 智能体设计系统架构，人工审批
+2. **架构设计** - Architect 智能体分析需求、推荐技术栈、设计系统架构，人工审批
 3. **任务拆解** - Manager 将需求拆分为具体任务
 4. **代码实现** - Developer 实现功能，Reviewer 审查代码
 5. **自动测试** - Tester 执行单元测试和 E2E 测试
 6. **合并发布** - 自动合并功能分支到 main
+
+**技术栈确定流程**：
+```
+需求输入 → Architect 分析 → 推荐技术栈 → 用户审批 → 保存到 crewforge.yaml
+```
 
 ### 断点续跑
 
