@@ -1,10 +1,11 @@
 """Manager agent for task orchestration and delegation."""
 
-from typing import Optional
+import os
+from typing import Optional, Any
 
-from crewai import Agent
+from crewai import Agent, LLM
 
-from ..config import AgentRole, get_llm_config
+from ..config import AgentRole, get_llm_config, LLMProvider
 from ..tools import FileSystemTool, ShellExecutorTool
 
 
@@ -75,6 +76,36 @@ class ManagerAgent:
         llm_config = get_llm_config()
         return llm_config.get_model_for_role(self.role)
 
+    def get_llm(self) -> Any:
+        """Get the LLM instance for this agent."""
+        llm_config = get_llm_config()
+        model = self.model
+
+        if llm_config.provider == LLMProvider.OPENAI_COMPATIBLE:
+            api_key = llm_config.openai_compatible_api_key or os.getenv("OPENROUTER_API_KEY")
+            base_url = llm_config.openai_compatible_base_url
+
+            return LLM(
+                model=model,
+                base_url=base_url,
+                api_key=api_key,
+            )
+        elif llm_config.provider == LLMProvider.ANTHROPIC:
+            return LLM(
+                model=f"anthropic/{model}",
+                api_key=llm_config.anthropic_api_key,
+            )
+        elif llm_config.provider == LLMProvider.OLLAMA:
+            return LLM(
+                model=f"ollama/{model}",
+                base_url=llm_config.ollama_base_url,
+            )
+        else:
+            return LLM(
+                model=model,
+                api_key=llm_config.openai_api_key,
+            )
+
     def get_tools(self) -> list:
         """Get manager-specific tools."""
         return [
@@ -92,7 +123,7 @@ class ManagerAgent:
                 tools=self.get_tools(),
                 verbose=self.verbose,
                 allow_delegation=True,  # Manager can delegate to other agents
-                llm=self.model,
+                llm=self.get_llm(),
                 max_iter=20,
             )
         return self._agent

@@ -46,22 +46,55 @@ playwright install chromium
 
 ### 环境变量
 
-创建 `.env` 文件：
+创建 `.env` 文件（参考 `.env.example`）：
+
+#### 方式一：使用官方 API
 
 ```bash
-# LLM 配置（选择一个提供商）
-# OpenAI
+# OpenAI 官方 API
 OPENAI_API_KEY=sk-xxx
 
-# 或 Anthropic
+# 或 Anthropic 官方 API
+CREWFORGE_LLM_PROVIDER=anthropic
 ANTHROPIC_API_KEY=sk-ant-xxx
+```
 
-# 或 OpenAI 兼容接口（如 Deepseek）
+#### 方式二：使用自定义 API 端点（代理/网关）
+
+当你有自己的 API 代理或网关时，可以通过设置 `BASE_URL` 来使用自定义端点：
+
+```bash
+# OpenAI + 自定义端点
+OPENAI_API_KEY=sk-your-key
+OPENAI_BASE_URL=http://127.0.0.1:8045/v1
+
+# Anthropic + 自定义端点
+CREWFORGE_LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your-auth-token
+ANTHROPIC_BASE_URL=https://your-proxy.example.com/api
+```
+
+#### 方式三：使用 OpenAI 兼容接口
+
+用于第三方 API（如 Deepseek、Azure OpenAI、本地 vLLM 等）：
+
+```bash
 CREWFORGE_LLM_PROVIDER=openai_compatible
 CREWFORGE_LLM_OPENAI_COMPATIBLE_BASE_URL=https://api.deepseek.com/v1
 CREWFORGE_LLM_OPENAI_COMPATIBLE_API_KEY=xxx
+```
 
-# 可选：搜索 API
+#### 方式四：使用本地 Ollama
+
+```bash
+CREWFORGE_LLM_PROVIDER=ollama
+CREWFORGE_LLM_OLLAMA_BASE_URL=http://localhost:11434
+```
+
+#### 可选配置
+
+```bash
+# 搜索 API
 CREWFORGE_SEARCH_API_KEY=xxx  # Brave Search API
 GITHUB_TOKEN=xxx  # GitHub API（提高速率限制）
 ```

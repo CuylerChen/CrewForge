@@ -51,7 +51,13 @@ class LLMConfig(BaseSettings):
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
 
-    # OpenAI Compatible settings
+    # OpenAI settings (custom base URL for proxies or compatible APIs)
+    openai_base_url: str | None = Field(default=None, alias="OPENAI_BASE_URL")
+
+    # Anthropic settings (custom base URL for proxies)
+    anthropic_base_url: str | None = Field(default=None, alias="ANTHROPIC_BASE_URL")
+
+    # OpenAI Compatible settings (legacy, for third-party providers like Deepseek)
     openai_compatible_base_url: str | None = None
     openai_compatible_api_key: str | None = None
 
@@ -77,19 +83,36 @@ class LLMConfig(BaseSettings):
         """Get the appropriate model for a given agent role."""
         strategic_roles = {AgentRole.MANAGER, AgentRole.ARCHITECT, AgentRole.REVIEWER}
         if role in strategic_roles:
-            return self.strategic_model
-        return self.execution_model
+            model = self.strategic_model
+        else:
+            model = self.execution_model
+
+        # Format model string for LiteLLM based on provider
+        if self.provider == LLMProvider.OPENAI_COMPATIBLE:
+            # For OpenRouter, use openrouter/ prefix
+            if self.openai_compatible_base_url and "openrouter" in self.openai_compatible_base_url:
+                return f"openrouter/{model}"
+            # For other compatible APIs, use openai/ prefix with base_url
+            return model
+        elif self.provider == LLMProvider.ANTHROPIC:
+            return f"anthropic/{model}"
+        elif self.provider == LLMProvider.OLLAMA:
+            return f"ollama/{model}"
+
+        return model
 
     def get_provider_config(self) -> dict:
         """Get provider-specific configuration."""
         if self.provider == LLMProvider.OPENAI:
-            return {
-                "api_key": self.openai_api_key,
-            }
+            config = {"api_key": self.openai_api_key}
+            if self.openai_base_url:
+                config["base_url"] = self.openai_base_url
+            return config
         elif self.provider == LLMProvider.ANTHROPIC:
-            return {
-                "api_key": self.anthropic_api_key,
-            }
+            config = {"api_key": self.anthropic_api_key}
+            if self.anthropic_base_url:
+                config["base_url"] = self.anthropic_base_url
+            return config
         elif self.provider == LLMProvider.OLLAMA:
             return {
                 "base_url": self.ollama_base_url,

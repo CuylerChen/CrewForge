@@ -52,7 +52,7 @@ class DeveloperAgent(BaseCrewForgeAgent):
                 tools=self.get_tools(),
                 verbose=self.verbose,
                 allow_delegation=False,
-                llm=self.model,
+                llm=self.get_llm(),
                 max_iter=15,
             )
         return self._agent
