@@ -3,7 +3,7 @@
 from crewai import Agent
 
 from ...config import AgentRole
-from ...tools import FileSystemTool, ShellExecutorTool, WebSearchTool
+from ...tools import FileSystemTool, ShellExecutorTool, WebSearchTool, get_openspec_tools
 from .base import BaseCrewForgeAgent
 
 
@@ -14,7 +14,8 @@ class ArchitectAgent(BaseCrewForgeAgent):
     name = "Software Architect"
     goal = """Design robust, scalable, and maintainable software architectures.
     Make informed technical decisions about technology stack, design patterns,
-    and system structure. Create clear architectural documentation and guidelines."""
+    and system structure. Create clear OpenSpec documentation (SPEC.md and PLAN.md)
+    that developers can follow."""
 
     backstory = """You are a seasoned software architect with 15+ years of experience
     across multiple technology domains. You have designed systems ranging from
@@ -30,12 +31,19 @@ class ArchitectAgent(BaseCrewForgeAgent):
     - Developer experience and productivity
     - Cost and infrastructure implications
 
-    You produce clear, actionable architectural documents that developers can follow."""
+    You follow spec-driven development (SDD) practices using OpenSpec format:
+    - SPEC.md: Captures functional requirements, scope, and "what" to build
+    - PLAN.md: Details implementation strategy, architecture, and "how" to build
+
+    You produce clear, actionable OpenSpec documentation that serves as living
+    documentation throughout the project lifecycle."""
 
     def get_tools(self) -> list:
         """Get architect-specific tools."""
         tools = self.get_base_tools()
         tools.append(WebSearchTool())
+        # Add OpenSpec tools for spec-driven development
+        tools.extend(get_openspec_tools())
         return tools
 
     def create_agent(self) -> Agent:

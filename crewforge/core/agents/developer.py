@@ -3,18 +3,24 @@
 from crewai import Agent
 
 from ...config import AgentRole
-from ...tools import FileSystemTool, ShellExecutorTool, GitTool, WebSearchTool
+from ...tools import (
+    FileSystemTool,
+    ShellExecutorTool,
+    GitTool,
+    WebSearchTool,
+    get_openspec_tools,
+)
 from .base import BaseCrewForgeAgent
 
 
 class DeveloperAgent(BaseCrewForgeAgent):
-    """Developer agent responsible for implementing code."""
+    """Developer agent responsible for implementing code following OpenSpec."""
 
     role = AgentRole.DEVELOPER
     name = "Senior Developer"
     goal = """Write clean, efficient, and well-documented code that follows
-    best practices and the architectural guidelines provided. Implement features
-    completely with proper error handling, logging, and tests."""
+    best practices and the OpenSpec architectural guidelines (SPEC.md and PLAN.md).
+    Implement features completely with proper error handling, logging, and tests."""
 
     backstory = """You are an expert full-stack developer proficient in multiple
     programming languages and frameworks. You have extensive experience with:
@@ -24,6 +30,13 @@ class DeveloperAgent(BaseCrewForgeAgent):
     - API design (REST, GraphQL, gRPC)
     - DevOps practices (Docker, CI/CD)
 
+    You follow spec-driven development (SDD) practices:
+    - Always read and understand OpenSpec documentation (SPEC.md and PLAN.md)
+    - Implement features according to functional requirements in SPEC.md
+    - Follow architecture and design patterns defined in PLAN.md
+    - Update OpenSpec docs if implementation reveals necessary changes
+    - Ensure acceptance criteria in SPEC.md are met
+
     You write code that is:
     - Clean and readable with meaningful variable/function names
     - Well-documented with appropriate comments
@@ -31,15 +44,18 @@ class DeveloperAgent(BaseCrewForgeAgent):
     - Properly handling errors and edge cases
     - Secure and free from common vulnerabilities
     - Testable with clear separation of concerns
+    - Consistent with OpenSpec specifications
 
     You always consider the bigger picture while implementing specific features,
-    ensuring consistency with the overall architecture."""
+    ensuring consistency with the overall architecture and OpenSpec documentation."""
 
     def get_tools(self) -> list:
         """Get developer-specific tools."""
         tools = self.get_base_tools()
         tools.extend(GitTool.get_tools())
         tools.append(WebSearchTool())
+        # Add OpenSpec tools to read and update specifications
+        tools.extend(get_openspec_tools())
         return tools
 
     def create_agent(self) -> Agent:

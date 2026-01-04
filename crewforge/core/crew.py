@@ -184,39 +184,38 @@ class CrewForgeOrchestrator:
         return approved
 
     def _design_architecture(self, requirements: str) -> str:
-        """Design system architecture using the Architect agent."""
-        console.print("\n[bold]Phase 2: Architecture Design[/]\n")
+        """Design system architecture using the Architect agent with OpenSpec format."""
+        console.print("\n[bold]Phase 2: Architecture Design (OpenSpec)[/]\n")
 
         self.db.update_project_status(self.project.id, ProjectStatus.ARCHITECTURE_PENDING)
 
-        # Create architecture task - Architect analyzes requirements and recommends tech stack
+        # Create architecture task - Architect analyzes requirements and creates OpenSpec docs
         arch_task = Task(
-            description=f"""Analyze the following requirements and design the software architecture:
+            description=f"""Analyze the following requirements and design the software architecture using OpenSpec format:
 
 {requirements}
 
 ## Your Tasks:
 
-### 1. Determine Project Type
-First, analyze what type of project this is:
-- Frontend only (web app, mobile app, browser extension)
-- Backend only (API, CLI tool, library, daemon service)
-- Full-stack (frontend + backend)
-- Other (data pipeline, ML model, infrastructure, etc.)
+### 1. Create SPEC.md (Functional Specification)
+Use the write_openspec tool with file_type='spec' to create SPEC.md containing:
 
-### 2. Recommend Technology Stack
-Based on the requirements, recommend the most suitable tech stack.
-Be specific and practical. Consider:
-- Project complexity and scale
-- Team expertise (if mentioned)
-- Performance requirements
-- Deployment environment
+**Purpose**: What this system does and why it exists
+**Scope**: What's in scope and out of scope
+**Functional Requirements**: Detailed feature specifications with acceptance criteria
+**Non-Functional Requirements**: Performance, security, scalability, availability
+**User Stories/Use Cases**: Key user workflows
+**Constraints and Assumptions**: Technical or business constraints
 
-Format your tech stack recommendation as:
+### 2. Create PLAN.md (Implementation Plan)
+Use the write_openspec tool with file_type='plan' to create PLAN.md containing:
+
+**Technology Stack Recommendation**:
+Format the tech stack as YAML code block:
 ```yaml
 tech_stack:
   type: frontend-only | backend-only | fullstack | cli | library | other
-  # Include only relevant sections based on type:
+  # Include only relevant sections:
   frontend:  # if applicable
     language: ...
     framework: ...
@@ -231,17 +230,25 @@ tech_stack:
     ...
 ```
 
-### 3. System Design
-Provide:
-1. System overview and high-level design
-2. Component structure and interactions
-3. Data models and storage design (if applicable)
-4. API design (if applicable)
-5. File/folder structure
-6. Key design decisions and rationale
+**Architecture Overview**: High-level system design and key components
+**Component Breakdown**: Detailed module/service structure
+**Data Models**: Database schema, entities, relationships
+**API Design**: Endpoints, contracts, interfaces (if applicable)
+**File/Folder Structure**: Recommended project layout
+**Dependencies**: External libraries and services
+**Implementation Phases**: Suggested development order
+**Design Decisions**: Key architectural choices and rationale
 
-Create clear documentation that developers can follow.""",
-            expected_output="Tech stack recommendation (in YAML format) followed by detailed architecture document",
+### 3. Guidelines
+- Be specific and measurable
+- Focus on "what" and "why" in SPEC.md
+- Focus on "how" and architecture in PLAN.md
+- Use clear, unambiguous language
+- Include examples where helpful
+- Think about future maintainability
+
+Use the write_openspec tool to create both SPEC.md and PLAN.md files.""",
+            expected_output="OpenSpec documentation created: SPEC.md and PLAN.md with tech stack and architecture details",
             agent=self.architect.create_agent(),
         )
 
@@ -271,7 +278,7 @@ Create clear documentation that developers can follow.""",
         return architecture
 
     def _save_tech_stack(self, architecture: str):
-        """Extract tech_stack from architecture and save to crewforge.yaml."""
+        """Extract tech_stack from OpenSpec PLAN.md and save to crewforge.yaml."""
         import yaml
         import re
 
@@ -279,14 +286,31 @@ Create clear documentation that developers can follow.""",
         if not config_path.exists():
             return
 
-        # Try to extract tech_stack YAML block from architecture
-        yaml_pattern = r"```yaml\s*\n(tech_stack:.*?)```"
-        match = re.search(yaml_pattern, architecture, re.DOTALL)
+        # First try to read from OpenSpec PLAN.md
+        openspec_plan = self.project_path / ".openspec" / "PLAN.md"
+        tech_stack_source = None
 
-        if match:
+        if openspec_plan.exists():
             try:
-                tech_stack_yaml = match.group(1)
-                tech_stack_data = yaml.safe_load(tech_stack_yaml)
+                plan_content = openspec_plan.read_text(encoding="utf-8")
+                # Extract tech_stack YAML block from PLAN.md
+                yaml_pattern = r"```yaml\s*\n(tech_stack:.*?)```"
+                match = re.search(yaml_pattern, plan_content, re.DOTALL)
+                if match:
+                    tech_stack_source = match.group(1)
+            except Exception as e:
+                console.print(f"[dim]Could not read PLAN.md: {e}[/]")
+
+        # Fallback to extracting from architecture output (for backward compatibility)
+        if not tech_stack_source:
+            yaml_pattern = r"```yaml\s*\n(tech_stack:.*?)```"
+            match = re.search(yaml_pattern, architecture, re.DOTALL)
+            if match:
+                tech_stack_source = match.group(1)
+
+        if tech_stack_source:
+            try:
+                tech_stack_data = yaml.safe_load(tech_stack_source)
 
                 # Load existing config
                 with open(config_path) as f:
@@ -302,7 +326,7 @@ Create clear documentation that developers can follow.""",
                 with open(config_path, "w") as f:
                     yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
 
-                console.print("[dim]Tech stack saved to crewforge.yaml[/]")
+                console.print("[dim]Tech stack saved to crewforge.yaml from OpenSpec[/]")
             except Exception as e:
                 console.print(f"[yellow]Warning: Could not parse tech stack: {e}[/]")
 
@@ -410,24 +434,64 @@ Create clear documentation that developers can follow.""",
         console.print("[green]Implementation completed[/]")
         return {"result": str(result)}
 
+    def _read_openspec_context(self) -> str:
+        """Read OpenSpec documentation for developer context."""
+        openspec_dir = self.project_path / ".openspec"
+        if not openspec_dir.exists():
+            return "No OpenSpec documentation available."
+
+        context_parts = []
+
+        # Read SPEC.md
+        spec_file = openspec_dir / "SPEC.md"
+        if spec_file.exists():
+            try:
+                spec_content = spec_file.read_text(encoding="utf-8")
+                context_parts.append(f"=== SPEC.md (Functional Requirements) ===\n{spec_content}")
+            except Exception:
+                pass
+
+        # Read PLAN.md
+        plan_file = openspec_dir / "PLAN.md"
+        if plan_file.exists():
+            try:
+                plan_content = plan_file.read_text(encoding="utf-8")
+                context_parts.append(f"=== PLAN.md (Architecture & Implementation) ===\n{plan_content}")
+            except Exception:
+                pass
+
+        return "\n\n".join(context_parts) if context_parts else "No OpenSpec documentation available."
+
     def _create_implementation_tasks(self, tasks: list) -> list:
-        """Create CrewAI tasks for implementation."""
+        """Create CrewAI tasks for implementation with OpenSpec context."""
         crewai_tasks = []
+
+        # Read OpenSpec context once for all tasks
+        openspec_context = self._read_openspec_context()
 
         for task_data in tasks:
             task = Task(
-                description=f"""Implement the following:
+                description=f"""Implement the following task following OpenSpec specifications:
 
+=== OpenSpec Context ===
+{openspec_context}
+
+=== Task Details ===
 Title: {task_data.get('title', 'Task')}
 Description: {task_data.get('description', '')}
 
-Requirements:
-1. Write clean, well-documented code
-2. Follow the architectural guidelines
-3. Include appropriate error handling
-4. Write unit tests for new code
-5. Commit changes with meaningful messages""",
-                expected_output="Implemented feature with tests and documentation",
+=== Requirements ===
+1. Follow SPEC.md functional requirements and acceptance criteria
+2. Adhere to PLAN.md architecture, design patterns, and file structure
+3. Write clean, well-documented code
+4. Include appropriate error handling
+5. Write unit tests for new code
+6. Commit changes with meaningful messages
+7. If implementation requires deviating from PLAN.md, document the change
+
+Important: Refer to OpenSpec documentation above for architectural decisions,
+coding standards, and implementation guidelines.""",
+                expected_output="Implemented feature following OpenSpec with tests and documentation",
                 agent=self.developer.create_agent(),
             )
             crewai_tasks.append(task)

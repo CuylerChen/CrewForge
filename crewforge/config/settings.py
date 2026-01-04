@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     require_requirement_approval: bool = True
     require_architecture_approval: bool = True
 
+    # OpenSpec settings
+    openspec_enabled: bool = True
+    openspec_dir: str = ".openspec"
+    openspec_auto_update: bool = True  # Auto update specs when implementation deviates
+
 
 @lru_cache
 def get_settings() -> Settings:
